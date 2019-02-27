@@ -249,3 +249,7 @@ func (p *path) onRTO(lastSentTime time.Time) bool {
 func (p *path) SetLeastUnacked(leastUnacked protocol.PacketNumber) {
 	p.leastUnacked = leastUnacked
 }
+
+func (p *path) GetCongestionWindow() protocol.ByteCount{
+	return congestion.GetCongestionWindow()
+}

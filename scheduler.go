@@ -12,6 +12,7 @@ import (
 type scheduler struct {
 	// XXX Currently round-robin based, inspired from MPTCP scheduler
 	quotas map[protocol.PathID]uint
+	waiting uint64
 }
 
 func (sch *scheduler) setup() {
@@ -208,8 +209,9 @@ pathLoop:
 func (sch *scheduler) selectPath(s *session, hasRetransmission bool, hasStreamRetransmission bool, fromPth *path) *path {
 	// XXX Currently round-robin
 	// TODO select the right scheduler dynamically
-	return sch.selectPathLowLatency(s, hasRetransmission, hasStreamRetransmission, fromPth)
+	//	return sch.selectPathLowLatency(s, hasRetransmission, hasStreamRetransmission, fromPth)
 	// return sch.selectPathRoundRobin(s, hasRetransmission, hasStreamRetransmission, fromPth)
+	return sch.selectPathEarliestCompletionFirst(s, hasRetransmission, hasStreamRetransmission, fromPth)
 }
 
 // Lock of s.paths must be free (in case of log print)
@@ -427,3 +429,259 @@ func (sch *scheduler) sendPacket(s *session) error {
 		}
 	}
 }
+
+func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmission bool, hasStreamRetransmission bool, fromPth *path)*path {
+
+	if len(s.paths) <= 1 {
+
+		if !hasRetransmission && !s.paths[protocol.InitialPathID].SendingAllowed() {
+
+			return nil
+
+		}
+
+		return s.paths[protocol.InitialPathID]
+
+	}	
+
+	if hasRetransmission && hasStreamRetransmission && fromPth.rttStats.SmoothedRTT() == 0 {
+
+		currentQuota := sch.quotas[fromPth.pathID]
+
+		for pathID , pth := range s.paths {
+
+			if pathID == protocol.InitialPathID || pathID == fromPth.pathID {
+
+				continue
+
+			}
+
+			
+
+			if sch.quotas[pathID] < currentQuota {
+
+				return pth
+
+			}
+
+		}
+
+	}
+
+
+	var bestPath *path
+
+	var secondBestPath *path 
+
+	var lowerRTT time.Duration
+
+	var currentRTT time.Duration
+
+	var secondLowerRTT time.Duration
+
+	var beta = 0.25
+
+
+	bestPathID := protocol.PathID(255)
+
+	pathLoop:
+
+	for pathID , pth := range s.paths {
+
+		if pth.potentiallyFailed.Get() {
+
+			continue pathLoop
+
+		}
+
+		
+
+		if pathID == protocol.InitialPathID {
+
+			continue pathLoop
+
+		}
+
+		
+
+		currentRTT = pth.rttStats.SmoothedRTT()
+
+		
+
+		if lowerRTT != 0 && currentRTT == 0 {
+
+			continue pathLoop
+
+		}
+
+
+		// Case if we have multiple paths unprobed
+
+		if currentRTT == 0 {
+
+			currentQuota , ok := sch.quotas[pathID]
+
+			
+
+			if !ok {
+
+				sch.quotas[pathID] = 0
+
+				currentQuota = 0
+
+			}
+
+			
+
+			lowerQuota , _ := sch.quotas[bestPathID]
+
+			if bestPath != nil && currentQuota > lowerQuota {
+
+				continue pathLoop
+
+			}
+
+		}
+
+		
+
+		if currentRTT >= lowerRTT {
+
+			if (secondLowerRTT == 0 || currentRTT < secondLowerRTT) && pth.SendingAllowed() {
+
+				// Update second best available path
+
+				secondLowerRTT = currentRTT
+
+				secondBestPath = pth
+
+			}
+
+
+			if currentRTT != 0 && lowerRTT != 0 && bestPath != nil {
+
+				continue pathLoop
+
+			}
+
+		}
+
+
+		// Update best path
+
+		lowerRTT = currentRTT
+
+		bestPath = pth
+
+		bestPathID = pathID
+
+	}
+
+	
+
+	if bestPath == nil {
+
+		if secondBestPath != nil {
+
+			return secondBestPath
+
+		}
+
+		return nil
+
+	}
+
+
+	if hasRetransmission || bestPath.SendingAllowed() {
+
+		return bestPath
+
+	}
+
+	if secondBestPath == nil {
+
+		return nil
+
+	}
+
+	var queueSize uint64
+
+	getQueueSize := func(s * stream) (bool , error) {
+
+		if s != nil {
+
+			queueSize = queueSize + uint64(s.lenOfDataForWriting())
+
+		}
+
+		return true , nil
+
+	}
+
+
+	s.streamsMap.Iterate(getQueueSize)
+
+
+	cwndBest := uint64(bestPath.GetCongestionWindow())
+
+	cwndSecond := uint64(secondBestPath.GetCongestionWindow())
+
+	deviationBest := uint64(bestPath.rttStats.MeanDeviation())
+
+	deviationSecond := uint64(secondBestPath.rttStats.MeanDeviation())
+
+
+	delta := deviationBest
+
+	if deviationBest < deviationSecond {
+
+		delta = deviationSecond
+
+	}
+
+	xBest := queueSize
+
+	if queueSize < cwndBest {
+
+		xBest = cwndBest
+
+	}
+
+
+	lhs := uint64(lowerRTT) * (xBest + cwndBest)
+
+	rhs := cwndBest * (uint64(secondLowerRTT) + delta)
+
+	if beta * float64(lhs) < (beta * float64(rhs) + float64(sch.waiting * rhs)) {
+
+		xSecond := queueSize
+
+		if queueSize < cwndSecond {
+
+			xSecond = cwndSecond
+
+		}
+
+		lhsSecond := uint64(secondLowerRTT) * xSecond
+
+		rhsSecond := cwndSecond * (2 * uint64(lowerRTT) + delta)
+
+		if lhsSecond > rhsSecond {
+
+			sch.waiting = 1
+
+			return nil
+
+		}
+
+	} else {
+
+		sch.waiting = 0
+
+	}
+
+	return secondBestPath
+
+}
+
+			
