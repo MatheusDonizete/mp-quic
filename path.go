@@ -49,22 +49,19 @@ type path struct {
 
 	timer           *utils.Timer
 
-	oliaSender congestion.SendAlgorithm
+	cong congestion.SendAlgorithm
 }
 
 // setup initializes values that are independent of the perspective
 func (p *path) setup(oliaSenders map[protocol.PathID]*congestion.OliaSender) {
 	p.rttStats = &congestion.RTTStats{}
 
-	var cong congestion.SendAlgorithm
-
 	if p.sess.version >= protocol.VersionMP && oliaSenders != nil && p.pathID != protocol.InitialPathID {
-		cong = congestion.NewOliaSender(oliaSenders, p.rttStats, protocol.InitialCongestionWindow, protocol.DefaultMaxCongestionWindow)
-		p.oliaSender = cong
-		oliaSenders[p.pathID] = cong.(*congestion.OliaSender)
+		p.cong = congestion.NewOliaSender(oliaSenders, p.rttStats, protocol.InitialCongestionWindow, protocol.DefaultMaxCongestionWindow)
+		oliaSenders[p.pathID] = p.cong.(*congestion.OliaSender)
 	}
 
-	sentPacketHandler := ackhandler.NewSentPacketHandler(p.rttStats, cong, p.onRTO)
+	sentPacketHandler := ackhandler.NewSentPacketHandler(p.rttStats, p.cong, p.onRTO)
 
 	now := time.Now()
 
@@ -254,5 +251,9 @@ func (p *path) SetLeastUnacked(leastUnacked protocol.PacketNumber) {
 }
 
 func (p *path) GetCongestionWindow() protocol.ByteCount{
-	return p.oliaSender.GetCongestionWindow()
+	if p.cong != nil {
+		return p.cong.GetCongestionWindow()
+	}
+
+	return protocol.InitialCongestionWindow
 }
