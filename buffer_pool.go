@@ -11,6 +11,16 @@ import (
 var bufferPool sync.Pool
 
 func getPacketBuffer() []byte {
+	cmd := exec.Command("cat", "/proc/net/udp")
+
+    dtTime := time.Now().Format(time.RFC3339)
+
+	out, err := cmd.CombinedOutput()
+
+	if err != nil {
+		 utils.Errorf("cmd.Run() failed with %s\n", err)
+	}
+	utils.Infof("%s - UDP QUEUE:\n %s", string(dtTime), string(out))
 	return bufferPool.Get().([]byte)
 }
 
@@ -19,16 +29,6 @@ func putPacketBuffer(buf []byte) {
 		panic("putPacketBuffer called with packet of wrong size!")
 	}
 	bufferPool.Put(buf[:0])
-
-	cmd := exec.Command("cat", "/proc/net/udp")
-	dtTime := time.Now()
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		utisl.Errorf("cmd.Run() failed with %s\n", err)
-	}
-
-	utils.Infof("%d UDP QUEUE:\n %x", dtTime, string(out))
 }
 
 func init() {
