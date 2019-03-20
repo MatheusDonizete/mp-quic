@@ -88,6 +88,7 @@ is_header = False
 header = ""
 max_rx = 0
 max_tx = 0
+drops = 0
 
 stime = atime = time.time()
 while stime >= atime - opts.runtime:

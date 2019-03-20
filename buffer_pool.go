@@ -2,7 +2,9 @@ package quic
 
 import (
 	"sync"
-
+	"time"
+	"os/exec"
+	"github.com/lucas-clemente/quic-go/internal/utils"
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 )
 
@@ -17,6 +19,16 @@ func putPacketBuffer(buf []byte) {
 		panic("putPacketBuffer called with packet of wrong size!")
 	}
 	bufferPool.Put(buf[:0])
+
+	cmd := exec.Command("cat", "/proc/net/udp")
+	dtTime := time.Now()
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		utisl.Errorf("cmd.Run() failed with %s\n", err)
+	}
+
+	utils.Infof("%d UDP QUEUE:\n %x", dtTime, string(out))
 }
 
 func init() {
