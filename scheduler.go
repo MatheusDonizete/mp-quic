@@ -566,4 +566,11 @@ func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmi
 	return secondBestPath
 }
 
-			
+func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetransmission bool, fromPth *path)*path { 
+	if len(s.paths) <= 1 {
+		if !hasRetransmission && !s.paths[protocol.InitialPathID].SendingAllowed() {
+			return nil
+		}
+		return s.paths[protocol.InitialPathID]
+	}
+}			
