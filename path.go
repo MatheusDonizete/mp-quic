@@ -50,6 +50,8 @@ type path struct {
 	timer           *utils.Timer
 
 	cong congestion.SendAlgorithm
+
+	owd int
 }
 
 // setup initializes values that are independent of the perspective
@@ -87,6 +89,15 @@ func (p *path) setup(oliaSenders map[protocol.PathID]*congestion.OliaSender) {
 func (p *path) close() error {
 	p.open.Set(false)
 	return nil
+}
+
+func calcOWD() func() int {
+	pktTsmp := time.Now()
+	return func() int {		
+		recTsmp := time.Now()
+		delta := recTsmp - pktTsmp
+		return delta
+	}
 }
 
 func (p *path) run() {
@@ -232,7 +243,7 @@ func (p *path) handlePacketImpl(pkt *receivedPacket) error {
 	if err != nil {
 		return err
 	}
-
+	p.owd = time.Now() - pkt.rcvTime
 	return p.sess.handleFrames(packet.frames, p)
 }
 

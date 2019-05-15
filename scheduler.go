@@ -2,7 +2,7 @@ package quic
 
 import (
 	"time"
-
+	"math"
 	"github.com/lucas-clemente/quic-go/ackhandler"
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 	"github.com/lucas-clemente/quic-go/internal/utils"
@@ -566,11 +566,88 @@ func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmi
 	return secondBestPath
 }
 
+func min(a, b int) int {
+    if a <= b {
+        return a
+    }
+    return b
+}
+
+func max(a, b int) int {
+    if a >= b {
+        return a
+    }
+    return b
+}
+
 func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetransmission bool, fromPth *path)*path { 
 	if len(s.paths) <= 1 {
 		if !hasRetransmission && !s.paths[protocol.InitialPathID].SendingAllowed() {
 			return nil
 		}
 		return s.paths[protocol.InitialPathID]
+	}
+
+	var lastDelta int
+	var bestPath *p
+
+	pathLoop:
+	for pathID, pth := range s.paths {
+		if !hasRetransmission && !pth.SendingAllowed() {
+			continue pathLoop
+		}
+
+		if pth.potentiallyFailed.Get() {
+			continue pathLoop
+		}
+		
+		if pathID == protocol.InitialPathID {
+			continue pathLoop
+		}
+
+		mss := uint64(pth.GetCongestionWindow())
+		rtt := pth.rttStats.SmoothedRTT()
+		abw := (rtt/mss) * 1/math.Sqrt()
+		if currentRTT == 0 {
+			currentQuota , ok := sch.quotas[pathID]			
+			if !ok {
+				sch.quotas[pathID] = 0
+				currentQuota = 0
+			}
+			lowerQuota , _ := sch.quotas[bestPathID]
+			if bestPath != nil && currentQuota > lowerQuota {
+				continue pathLoop
+			}
+		}		
+
+		pathLoop2:
+		for pathJID, pthj := range s.paths {
+			if pathID == pathJID {
+				continue pathLoop2
+			}
+			
+			mssj := uint64(pthj.GetCongestionWindow())
+			rttj := pthj.rttStats.SmoothedRTT()
+			abwj := (rtt/mss) * 1/math.Sqrt()
+			
+			deltaOwd := (pth.owd - pthj.owd) / max(pth.owd, pthj.owd)
+			deltaAbw := (abw - abwj) / max(abw, abwj)
+
+			delta := max(deltaOwd, deltaAbw)
+
+			if lastDelta == nil {
+				lastDelta := delta
+			}
+
+			if delta < lastDelta {
+				lastDelta := delta
+				
+				if rtt < rttj {
+					bestPath = pth
+				} else {
+					bestPath = pthj
+				}				
+			}
+		}
 	}
 }			
