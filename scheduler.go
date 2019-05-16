@@ -650,4 +650,10 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 			}
 		}
 	}
+
+	if hasRetransmission || bestPath.SendingAllowed() {
+		return bestPath
+	}
+
+	return nil
 }			
