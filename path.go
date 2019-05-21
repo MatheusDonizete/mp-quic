@@ -91,11 +91,11 @@ func (p *path) close() error {
 	return nil
 }
 
-func calcOWD() func() int {
+func calcOWD() func() uint64 {
 	pktTsmp := time.Now()
-	return func() int {		
+	return func() uint64 {		
 		recTsmp := time.Now()
-		delta := recTsmp - pktTsmp
+		delta := recTsmp.Sub(pktTsmp)
 		return delta
 	}
 }
@@ -243,7 +243,7 @@ func (p *path) handlePacketImpl(pkt *receivedPacket) error {
 	if err != nil {
 		return err
 	}
-	p.owd = time.Now() - pkt.rcvTime
+	p.owd := time.Now().Sub(pkt.rcvTime)
 	return p.sess.handleFrames(packet.frames, p)
 }
 
@@ -267,4 +267,9 @@ func (p *path) GetCongestionWindow() protocol.ByteCount{
 	}
 
 	return protocol.InitialCongestionWindow
+}
+
+
+func (p *path) GetLoss() {
+	return p.cong.GetLoss()
 }

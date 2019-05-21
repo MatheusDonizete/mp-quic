@@ -46,6 +46,8 @@ type OliaSender struct {
 	// Number of connections to simulate
 	numConnections int
 
+	loss uint64
+
 	// ACK counter for the Reno implementation
 	congestionWindowCount protocol.ByteCount
 
@@ -63,6 +65,7 @@ func NewOliaSender(oliaSenders map[protocol.PathID]*OliaSender, rttStats *RTTSta
 		slowstartThreshold:         initialMaxCongestionWindow,
 		maxTCPCongestionWindow:     initialMaxCongestionWindow,
 		numConnections:             defaultNumConnections,
+		loss:						0,
 		olia:                       NewOlia(0),
 		oliaSenders:                oliaSenders,
 	}
@@ -246,6 +249,7 @@ func (o *OliaSender) OnPacketAcked(ackedPacketNumber protocol.PacketNumber, acke
 }
 
 func (o *OliaSender) OnPacketLost(packetNumber protocol.PacketNumber, lostBytes protocol.ByteCount, bytesInFlight protocol.ByteCount) {
+	o.loss++;
 	// TCP NewReno (RFC6582) says that once a loss occurs, any losses in packets
 	// already sent should be treated as a single loss event, since it's expected.
 	if packetNumber <= o.largestSentAtLastCutback {
@@ -366,4 +370,8 @@ func (o *OliaSender) InRecovery() bool {
 
 func (o *OliaSender) InSlowStart() bool {
 	return o.GetCongestionWindow() < o.GetSlowStartThreshold()
+}
+
+func (o *OliaSender) GetLoss() uint64 {
+	return o.loss
 }
