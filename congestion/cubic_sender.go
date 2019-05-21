@@ -52,7 +52,8 @@ type cubicSender struct {
 
 	// Number of connections to simulate.
 	numConnections int
-
+	
+	loss uint64
 	// ACK counter for the Reno implementation.
 	congestionWindowCount protocol.ByteCount
 
@@ -71,6 +72,7 @@ func NewCubicSender(clock Clock, rttStats *RTTStats, reno bool, initialCongestio
 		slowstartThreshold:         initialMaxCongestionWindow,
 		maxTCPCongestionWindow:     initialMaxCongestionWindow,
 		numConnections:             defaultNumConnections,
+		loss:						0,
 		cubic:                      NewCubic(clock),
 		reno:                       reno,
 	}
@@ -299,4 +301,8 @@ func (c *cubicSender) RetransmissionDelay() time.Duration {
 
 func (c *cubicSender) SmoothedRTT() time.Duration {
 	return c.rttStats.SmoothedRTT()
+}
+
+func (c *cubicSender) GetLoss() uint64 {
+	return c.loss
 }
