@@ -566,14 +566,14 @@ func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmi
 	return secondBestPath
 }
 
-func min(a, b int) int {
+func min(a, b uint64) uint64 {
     if a <= b {
         return a
     }
     return b
 }
 
-func max(a, b int) int {
+func max(a, b uint64) uint64 {
     if a >= b {
         return a
     }
@@ -588,7 +588,7 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 		return s.paths[protocol.InitialPathID]
 	}
 
-	var lastDelta uint64
+	var lastDelta uint64 = 0
 	var bestPath *path
 
 	pathLoop:
@@ -605,9 +605,11 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 			continue pathLoop
 		}
 
+		loss := math.Sqrt(float64(pthj.GetLoss()))
+		lossf := uint64(loss)
 		mss := uint64(pth.GetCongestionWindow())
 		rtt :=  uint64(pth.rttStats.SmoothedRTT() / 2)
-		abw := uint64((rtt/mss) * 1/math.Sqrt(float64(pth.GetLoss())))
+		abw :=  uint64((rtt / mss) * uint64(1 / lossf)
 		if currentRTT == 0 {
 			currentQuota , ok := sch.quotas[pathID]			
 			if !ok {
@@ -626,16 +628,18 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 				continue pathLoop2
 			}
 			
+			lossj := math.Sqrt(float64(pthj.GetLoss()))
+			lossjf := uint64(lossj)
 			mssj := uint64(pthj.GetCongestionWindow())
 			rttj := uint64(pthj.rttStats.SmoothedRTT() / 2)
-			abwj :=  uint64((rtt/mss) * 1/math.Sqrt(float64(pthj.GetLoss())))
+			abwj :=  uint64((rttj / mssj) * uint64(1 / lossjf)
 			
 			deltaOwd := uint64((pth.owd - pthj.owd) / max(pth.owd, pthj.owd))
 			deltaAbw := uint64((abw - abwj) / max(abw, abwj))
 
 			delta := max(deltaOwd, deltaAbw)
 
-			if lastDelta == nil {
+			if lastDelta == 0 {
 				lastDelta := delta
 			}
 

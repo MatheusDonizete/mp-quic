@@ -22,6 +22,7 @@ type SendAlgorithm interface {
 
 	// Experiments
 	SetSlowStartLargeReduction(enabled bool)
+	GetLoss() uint64
 }
 
 // SendAlgorithmWithDebugInfo adds some debug functions to SendAlgorithm
