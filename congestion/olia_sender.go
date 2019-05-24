@@ -65,7 +65,7 @@ func NewOliaSender(oliaSenders map[protocol.PathID]*OliaSender, rttStats *RTTSta
 		slowstartThreshold:         initialMaxCongestionWindow,
 		maxTCPCongestionWindow:     initialMaxCongestionWindow,
 		numConnections:             defaultNumConnections,
-		loss:						0,
+		loss:						1, // starts with 1 to avoid calculation errors
 		olia:                       NewOlia(0),
 		oliaSenders:                oliaSenders,
 	}
