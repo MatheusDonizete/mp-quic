@@ -609,6 +609,14 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 		loss := math.Sqrt(float64(pth.GetLoss()))
 		lossf := uint64(loss)
 		mss := uint64(pth.GetCongestionWindow())
+		if lossf == 0 {
+			lossf = 1
+		}
+
+		if mss == 0 {
+			mss = 1
+		}
+
 		rtt :=  uint64(pth.rttStats.SmoothedRTT() / 2)
 		abw :=  uint64((rtt / mss) * uint64(1 / lossf))
 
@@ -622,6 +630,15 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 			lossjf := uint64(lossj)
 			mssj := uint64(pthj.GetCongestionWindow())
 			rttj := uint64(pthj.rttStats.SmoothedRTT() / 2)
+
+			if lossjf == 0 {
+				lossjf = 1
+			}
+	
+			if mssj == 0 {
+				mssj = 1
+			}
+
 			abwj :=  uint64((rttj / mssj) * uint64(1 / lossjf))
 
 			deltaOwd := uint64((pth.owd - pthj.owd) / max(pth.owd, pthj.owd))
