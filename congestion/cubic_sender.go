@@ -303,5 +303,10 @@ func (c *cubicSender) SmoothedRTT() time.Duration {
 }
 
 func (c *cubicSender) GetLoss() uint64 {
-	return uint64(c.stats.loss)
+	var loss = uint64(c.stats.loss)
+	if (loss < 1) {
+		return 1
+	}
+
+	return loss
 }
