@@ -94,7 +94,7 @@ func (p *path) close() error {
 
 func calcOWD() func() uint64 {
 	pktTsmp := time.Now()
-	return func() uint64 {		
+	return func() uint64 {
 		recTsmp := time.Now()
 		delta := recTsmp.Sub(pktTsmp)
 		return uint64(delta/time.Millisecond)
@@ -275,5 +275,9 @@ func (p *path) GetCongestionWindow() protocol.ByteCount{
 
 
 func (p *path) GetLoss() uint64 {
-	return p.cong.GetLoss()
+	if p.cong != nil {
+		return p.cong.GetLoss()
+	}
+
+	return 1
 }

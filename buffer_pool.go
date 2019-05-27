@@ -2,25 +2,25 @@ package quic
 
 import (
 	"sync"
-	"time"
-	"os/exec"
-	"github.com/lucas-clemente/quic-go/internal/utils"
+//	"time"
+//	"os/exec"
+//	"github.com/lucas-clemente/quic-go/internal/utils"
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 )
 
 var bufferPool sync.Pool
 
 func getPacketBuffer() []byte {
-	cmd := exec.Command("cat", "/proc/net/udp")
+//	cmd := exec.Command("cat", "/proc/net/udp")
 
-    dtTime := time.Now().UnixNano()
+//	dtTime := time.Now().UnixNano()
 
-	out, err := cmd.CombinedOutput()
+//	out, err := cmd.CombinedOutput()
 
-	if err != nil {
-		 utils.Errorf("cmd.Run() failed with %s\n", err)
-	}
-	utils.Infof("%d - UDP QUEUE:\n %s", dtTime, string(out))
+//	if err != nil {
+//		 utils.Errorf("cmd.Run() failed with %s\n", err)
+//	}
+//	utils.Infof("%d - UDP QUEUE:\n %s", dtTime, string(out))
 	return bufferPool.Get().([]byte)
 }
 
