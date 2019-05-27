@@ -576,8 +576,15 @@ func min(a, b uint64) uint64 {
 
 func max(a, b uint64) uint64 {
     if a >= b {
+		if a == 0 {
+			return 1
+		}
         return a
     }
+
+	if b == 0 {
+		return 1
+	}
     return b
 }
 
