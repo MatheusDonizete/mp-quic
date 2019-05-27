@@ -13,14 +13,14 @@ var bufferPool sync.Pool
 func getPacketBuffer() []byte {
 	cmd := exec.Command("cat", "/proc/net/udp")
 
-    dtTime := time.Now().Format(time.RFC3339)
+    dtTime := time.Now().UnixNano()
 
 	out, err := cmd.CombinedOutput()
 
 	if err != nil {
 		 utils.Errorf("cmd.Run() failed with %s\n", err)
 	}
-	utils.Infof("%s - UDP QUEUE:\n %s", string(dtTime), string(out))
+	utils.Infof("%d - UDP QUEUE:\n %s", dtTime, string(out))
 	return bufferPool.Get().([]byte)
 }
 

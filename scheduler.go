@@ -211,7 +211,8 @@ func (sch *scheduler) selectPath(s *session, hasRetransmission bool, hasStreamRe
 	// TODO select the right scheduler dynamically
 	// return sch.selectPathLowLatency(s, hasRetransmission, hasStreamRetransmission, fromPth)
 	// return sch.selectPathRoundRobin(s, hasRetransmission, hasStreamRetransmission, fromPth)
-	return sch.selectPathEarliestCompletionFirst(s, hasRetransmission, hasStreamRetransmission, fromPth)
+	// return sch.selectPathEarliestCompletionFirst(s, hasRetransmission, hasStreamRetransmission, fromPth)
+	return sch.stout(s, hasRetransmission, hasStreamRetransmission, fromPth)
 }
 
 // Lock of s.paths must be free (in case of log print)
@@ -436,7 +437,7 @@ func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmi
 			return nil
 		}
 		return s.paths[protocol.InitialPathID]
-	}	
+	}
 
 	if hasRetransmission && hasStreamRetransmission && fromPth.rttStats.SmoothedRTT() == 0 {
 		currentQuota := sch.quotas[fromPth.pathID]
@@ -451,7 +452,7 @@ func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmi
 	}
 
 	var bestPath *path
-	var secondBestPath *path 
+	var secondBestPath *path
 	var lowerRTT time.Duration
 	var currentRTT time.Duration
 	var secondLowerRTT time.Duration
@@ -475,7 +476,7 @@ func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmi
 
 		// Case if we have multiple paths unprobed
 		if currentRTT == 0 {
-			currentQuota , ok := sch.quotas[pathID]			
+			currentQuota , ok := sch.quotas[pathID]
 			if !ok {
 				sch.quotas[pathID] = 0
 				currentQuota = 0
@@ -526,7 +527,7 @@ func (sch *scheduler) selectPathEarliestCompletionFirst(s *session, hasRetransmi
 		}
 		return true , nil
 	}
-	
+
 	s.streamsMap.Iterate(getQueueSize)
 	cwndBest := uint64(bestPath.GetCongestionWindow())
 	cwndSecond := uint64(secondBestPath.GetCongestionWindow())
@@ -600,57 +601,45 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 		if pth.potentiallyFailed.Get() {
 			continue pathLoop
 		}
-		
+
 		if pathID == protocol.InitialPathID {
 			continue pathLoop
 		}
 
-		loss := math.Sqrt(float64(pthj.GetLoss()))
+		loss := math.Sqrt(float64(pth.GetLoss()))
 		lossf := uint64(loss)
 		mss := uint64(pth.GetCongestionWindow())
 		rtt :=  uint64(pth.rttStats.SmoothedRTT() / 2)
-		abw :=  uint64((rtt / mss) * uint64(1 / lossf)
-		if currentRTT == 0 {
-			currentQuota , ok := sch.quotas[pathID]			
-			if !ok {
-				sch.quotas[pathID] = 0
-				currentQuota = 0
-			}
-			lowerQuota , _ := sch.quotas[bestPathID]
-			if bestPath != nil && currentQuota > lowerQuota {
-				continue pathLoop
-			}
-		}		
+		abw :=  uint64((rtt / mss) * uint64(1 / lossf))
 
 		pathLoop2:
 		for pathJID, pthj := range s.paths {
 			if pathID == pathJID {
 				continue pathLoop2
 			}
-			
+
 			lossj := math.Sqrt(float64(pthj.GetLoss()))
 			lossjf := uint64(lossj)
 			mssj := uint64(pthj.GetCongestionWindow())
 			rttj := uint64(pthj.rttStats.SmoothedRTT() / 2)
-			abwj :=  uint64((rttj / mssj) * uint64(1 / lossjf)
-			
+			abwj :=  uint64((rttj / mssj) * uint64(1 / lossjf))
+
 			deltaOwd := uint64((pth.owd - pthj.owd) / max(pth.owd, pthj.owd))
 			deltaAbw := uint64((abw - abwj) / max(abw, abwj))
 
 			delta := max(deltaOwd, deltaAbw)
 
 			if lastDelta == 0 {
-				lastDelta := delta
+				lastDelta = delta
 			}
 
 			if delta < lastDelta {
-				lastDelta := delta
-				
+				lastDelta = delta
 				if rtt < rttj {
 					bestPath = pth
 				} else {
 					bestPath = pthj
-				}				
+				}
 			}
 		}
 	}
@@ -660,4 +649,4 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 	}
 
 	return nil
-}			
+}

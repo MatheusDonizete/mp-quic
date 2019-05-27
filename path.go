@@ -51,12 +51,13 @@ type path struct {
 
 	cong congestion.SendAlgorithm
 
-	owd int
+	owd uint64
 }
 
 // setup initializes values that are independent of the perspective
 func (p *path) setup(oliaSenders map[protocol.PathID]*congestion.OliaSender) {
 	p.rttStats = &congestion.RTTStats{}
+	p.owd = 0;
 
 	if p.sess.version >= protocol.VersionMP && oliaSenders != nil && p.pathID != protocol.InitialPathID {
 		p.cong = congestion.NewOliaSender(oliaSenders, p.rttStats, protocol.InitialCongestionWindow, protocol.DefaultMaxCongestionWindow)
@@ -96,7 +97,7 @@ func calcOWD() func() uint64 {
 	return func() uint64 {		
 		recTsmp := time.Now()
 		delta := recTsmp.Sub(pktTsmp)
-		return delta
+		return uint64(delta/time.Millisecond)
 	}
 }
 
@@ -243,7 +244,10 @@ func (p *path) handlePacketImpl(pkt *receivedPacket) error {
 	if err != nil {
 		return err
 	}
-	p.owd := time.Now().Sub(pkt.rcvTime)
+	var tstp = time.Now()
+	var owd = tstp.Sub(pkt.rcvTime)
+	p.owd = uint64(owd / time.Millisecond)
+
 	return p.sess.handleFrames(packet.frames, p)
 }
 
@@ -270,6 +274,6 @@ func (p *path) GetCongestionWindow() protocol.ByteCount{
 }
 
 
-func (p *path) GetLoss() {
+func (p *path) GetLoss() uint64 {
 	return p.cong.GetLoss()
 }
