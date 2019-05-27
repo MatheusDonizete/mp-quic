@@ -633,6 +633,14 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 				continue pathLoop2
 			}
 
+			if pathJID == protocol.InitialPathID {
+				continue pathLoop2
+			}
+
+			if !hasRetransmission && !pthj.SendingAllowed() {
+				continue pathLoop2
+			}
+
 			lossj := math.Sqrt(float64(pthj.GetLoss()))
 			lossjf := uint64(lossj)
 			mssj := uint64(pthj.GetCongestionWindow())
@@ -668,9 +676,5 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 		}
 	}
 
-	if hasRetransmission || bestPath.SendingAllowed() {
-		return bestPath
-	}
-
-	return nil
+	return bestPath
 }
