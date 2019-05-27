@@ -211,8 +211,8 @@ func (sch *scheduler) selectPath(s *session, hasRetransmission bool, hasStreamRe
 	// TODO select the right scheduler dynamically
 	// return sch.selectPathLowLatency(s, hasRetransmission, hasStreamRetransmission, fromPth)
 	// return sch.selectPathRoundRobin(s, hasRetransmission, hasStreamRetransmission, fromPth)
-	return sch.selectPathEarliestCompletionFirst(s, hasRetransmission, hasStreamRetransmission, fromPth)
-	// return sch.stout(s, hasRetransmission, hasStreamRetransmission, fromPth)
+	// return sch.selectPathEarliestCompletionFirst(s, hasRetransmission, hasStreamRetransmission, fromPth)
+	return sch.stout(s, hasRetransmission, hasStreamRetransmission, fromPth)
 }
 
 // Lock of s.paths must be free (in case of log print)
