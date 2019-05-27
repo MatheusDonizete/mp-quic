@@ -52,8 +52,7 @@ type cubicSender struct {
 
 	// Number of connections to simulate.
 	numConnections int
-	
-	loss uint64
+
 	// ACK counter for the Reno implementation.
 	congestionWindowCount protocol.ByteCount
 
@@ -72,7 +71,6 @@ func NewCubicSender(clock Clock, rttStats *RTTStats, reno bool, initialCongestio
 		slowstartThreshold:         initialMaxCongestionWindow,
 		maxTCPCongestionWindow:     initialMaxCongestionWindow,
 		numConnections:             defaultNumConnections,
-		loss:						0,
 		cubic:                      NewCubic(clock),
 		reno:                       reno,
 	}
@@ -147,6 +145,7 @@ func (c *cubicSender) OnPacketAcked(ackedPacketNumber protocol.PacketNumber, ack
 }
 
 func (c *cubicSender) OnPacketLost(packetNumber protocol.PacketNumber, lostBytes protocol.ByteCount, bytesInFlight protocol.ByteCount) {
+	c.stats.loss++
 	// TCP NewReno (RFC6582) says that once a loss occurs, any losses in packets
 	// already sent should be treated as a single loss event, since it's expected.
 	if packetNumber <= c.largestSentAtLastCutback {
@@ -304,5 +303,5 @@ func (c *cubicSender) SmoothedRTT() time.Duration {
 }
 
 func (c *cubicSender) GetLoss() uint64 {
-	return c.loss
+	return uint64(c.stats.loss)
 }
