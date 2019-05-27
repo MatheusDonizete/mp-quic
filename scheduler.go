@@ -13,10 +13,15 @@ type scheduler struct {
 	// XXX Currently round-robin based, inspired from MPTCP scheduler
 	quotas map[protocol.PathID]uint
 	waiting uint64
+	lastPath *path
+	lastOwd uint64
+	lastAbw uint64
 }
 
 func (sch *scheduler) setup() {
 	sch.quotas = make(map[protocol.PathID]uint)
+	lastOwd = 1;
+	lastAbw = 1;
 }
 
 func (sch *scheduler) getRetransmission(s *session) (hasRetransmission bool, retransmitPacket *ackhandler.Packet, pth *path) {
@@ -599,6 +604,10 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 	var lastDelta uint64 = 0
 	var bestPath *path
 
+	if sch.lastAbw == 1 && sch.lastOwd == 1 {
+		sch.lastPath = s.paths[protocol.InitialPathID]
+	}
+
 	pathLoop:
 	for pathID, pth := range s.paths {
 		if !hasRetransmission && !pth.SendingAllowed() {
@@ -616,65 +625,31 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 		loss := math.Sqrt(float64(pth.GetLoss()))
 		lossf := uint64(loss)
 		mss := uint64(pth.GetCongestionWindow())
-		if lossf == 0 {
-			lossf = 1
-		}
-
-		if mss == 0 {
-			mss = 1
-		}
 
 		rtt :=  uint64(pth.rttStats.SmoothedRTT() / 2)
 		abw :=  uint64((rtt / mss) * uint64(1 / lossf))
 
-		pathLoop2:
-		for pathJID, pthj := range s.paths {
-			if pathID == pathJID {
-				continue pathLoop2
-			}
+		deltaOwd := uint64((rtt - sch.lastOwd) / max(rtt, sch.lastOwd))
+		deltaAbw := uint64((abw - sch.lastAbw) / max(abw, sch.lastAbw))
 
-			if pathJID == protocol.InitialPathID {
-				continue pathLoop2
-			}
+		delta := max(deltaOwd, deltaAbw)
 
-			if !hasRetransmission && !pthj.SendingAllowed() {
-				continue pathLoop2
-			}
+		if lastDelta == 0 {
+			lastDelta = delta
+		}
 
-			lossj := math.Sqrt(float64(pthj.GetLoss()))
-			lossjf := uint64(lossj)
-			mssj := uint64(pthj.GetCongestionWindow())
-			rttj := uint64(pthj.rttStats.SmoothedRTT() / 2)
-
-			if lossjf == 0 {
-				lossjf = 1
-			}
-	
-			if mssj == 0 {
-				mssj = 1
-			}
-
-			abwj :=  uint64((rttj / mssj) * uint64(1 / lossjf))
-
-			deltaOwd := uint64((pth.owd - pthj.owd) / max(pth.owd, pthj.owd))
-			deltaAbw := uint64((abw - abwj) / max(abw, abwj))
-
-			delta := max(deltaOwd, deltaAbw)
-
-			if lastDelta == 0 {
-				lastDelta = delta
-			}
-
-			if delta < lastDelta {
-				lastDelta = delta
-				if rtt < rttj {
-					bestPath = pth
-				} else {
-					bestPath = pthj
-				}
+		if delta < lastDelta {
+			lastDelta = delta
+			if rtt < sch.lastOwd {
+				bestPath = pth
+				sch.lastPath = bestPath
+				sch.lastOwd = rtt
+				sch.lastAbw = abw
+			} else {
+				bestPath = sch.lastPath
 			}
 		}
 	}
-
+	
 	return bestPath
 }
