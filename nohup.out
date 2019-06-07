@@ -1,0 +1,33 @@
+Start collecting RX and TX queue statistics information and dropped packages result for port (443)
+Maximum tx queue: 0 bytes, 0 KB, 0 MB; 
+Maximum rx queue: 0 bytes, 0 KB, 0 MB; 
+Start collecting RX and TX queue statistics information and dropped packages result for port (443)
+Maximum tx queue: 0 bytes, 0 KB, 0 MB; 
+Maximum rx queue: 0 bytes, 0 KB, 0 MB; 
+Port is required!
+Usage: udpstat.py [options] port
+
+UDP buffer size (RX, TX) and dropped packages statistics program, written by
+PZolee (pzoleex @ freemail.hu), 2012
+
+Options:
+  --version             show program's version number and exit
+  -h, --help            show this help message and exit
+  -o <filename>, --output=<filename>
+                        The name of the output file
+  -r, --rx              Measure the size of RX(incoming) buffer
+  -t, --tx              Measure the size of TX(outgoing) buffer
+  -d, --drops           Measure the number of dropped packages for RX and TX
+                        buffers
+  -b BLOCK_SIZE, --displayed-blocks=BLOCK_SIZE
+                        The displayed block size for the TX, RX queues.
+                        Possible values: B, K, M, all; default: all
+  -l <local|remote>, --listened-port-type=<local|remote>
+                        The type of the listened port, default: local
+  -f FREQ, --freq=FREQ  The time between two polls in sec, default: 1
+  -u RUNTIME, --run-time=RUNTIME
+                        The running time if given. Default: untill CTRL+C
+  -c, --csv             Generate CSV output format
+Start collecting RX and TX queue statistics information and dropped packages result for port (6121)
+Maximum tx queue: 0 bytes, 0 KB, 0 MB; 
+Maximum rx queue: 0 bytes, 0 KB, 0 MB; 

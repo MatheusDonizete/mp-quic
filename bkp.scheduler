@@ -593,7 +593,7 @@ func max(a, b uint64) uint64 {
     return b
 }
 
-func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetransmission bool, fromPth *path)*path {
+func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetransmission bool, fromPth *path)*path { 
 	if len(s.paths) <= 1 {
 		if !hasRetransmission && !s.paths[protocol.InitialPathID].SendingAllowed() {
 			return nil
@@ -601,29 +601,13 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 		return s.paths[protocol.InitialPathID]
 	}
 
-  	if hasRetransmission && hasStreamRetransmission && fromPth.rttStats.SmoothedRTT() == 0 {
-    	currentQuota := sch.quotas[fromPth.pathID]
-        for pathID , pth := range s.paths {
-            if pathID == protocol.InitialPathID || pathID == fromPth.pathID {
-                continue
-            }
-            if sch.quotas[pathID] < currentQuota {
-                return pth
-            }
-        }
-    }
-
 	var lastDelta uint64 = 0
-
 	var bestPath *path
-	var secondBestPath *path
-	var lowerRTT time.Duration
-	var secondLowerRTT time.Duration
-	var currentRTT time.Duration
-	var beta = 0.25
 
-	//selectedPathID := protocol.PathID(255)
-	bestPathID := protocol.PathID(255)
+	if sch.lastAbw == 1 && sch.lastOwd == 1 {
+		sch.lastPath = s.paths[protocol.InitialPathID]
+	}
+
 	pathLoop:
 	for pathID, pth := range s.paths {
 		if !hasRetransmission && !pth.SendingAllowed() {
@@ -638,84 +622,39 @@ func (sch *scheduler) stout(s *session, hasRetransmission bool, hasStreamRetrans
 			continue pathLoop
 		}
 
-		currentRTT = (pth.rttStats.SmoothedRTT() / 2)
-
-		if lowerRTT != 0 && currentRTT == 0 {
-			continue pathLoop
-		}
-
-		if currentRTT == 0 {
-        	currentQuota , ok := sch.quotas[pathID]
-            if !ok {
-            	sch.quotas[pathID] = 0
-                currentQuota = 0
-            }
-            lowerQuota , _ := sch.quotas[bestPathID]
-            if bestPath != nil && currentQuota > lowerQuota {
-                continue pathLoop
-            }
-        }
-		if currentRTT >= lowerRTT {
-            if (secondLowerRTT == 0 || currentRTT < secondLowerRTT) && pth.SendingAllowed() {
-                // Update second best available path
-                secondLowerRTT = currentRTT
-                secondBestPath = pth
-            }
-			if currentRTT != 0 && lowerRTT != 0 && bestPath != nil {
-            	continue pathLoop
-        	}
-        }
-
-		lowerRTT = currentRTT
-        bestPath = pth
-        bestPathID = pathID
-		//
-		
 		loss := math.Sqrt(float64(pth.GetLoss()))
 		lossf := uint64(loss)
-
 		mss := uint64(pth.GetCongestionWindow())
-		abw := uint64(currentRTT) / uint64(mss) * uint64(1 / lossf)
 
-//		deltaOwd := uint64((lowerRTT - sch.lastOwd) / max(lowerRTT, sch.lastOwd))
+		rtt :=  uint64(pth.rttStats.SmoothedRTT() / 2)
+		abw :=  uint64((rtt / mss) * uint64(1 / lossf))
+
+		deltaOwd := uint64((rtt - sch.lastOwd) / max(rtt, sch.lastOwd))
 		deltaAbw := uint64((abw - sch.lastAbw) / max(abw, sch.lastAbw))
 
-		delta := deltaAbw
+		delta := max(deltaOwd, deltaAbw)
 
 		if lastDelta == 0 {
 			lastDelta = delta
 		}
 
-		cwndBest := uint64(bestPath.GetCongestionWindow())
-        cwndSecond := uint64(secondBestPath.GetCongestionWindow())
-
-/*		if delta < lastDelta {
+		if delta < lastDelta {
 			lastDelta = delta
-			if lo < sch.lastOwd {
+			if rtt < sch.lastOwd {
 				bestPath = pth
 				sch.lastPath = bestPath
 				sch.lastOwd = rtt
 				sch.lastAbw = abw
 			}
 		}
-*/
-		lhs := uint64(lowerRTT) * (delta + cwndBest)
-		rhs := cwndBest * (uint64(secondLowerRTT) + delta)
-		if beta * float64(lhs) < (beta * float64(rhs) + float64(sch.waiting * rhs)) {
-		    xSecond := delta
-		    if delta < cwndSecond {
-		        xSecond = cwndSecond
-		    }
-		    lhsSecond := uint64(secondLowerRTT) * xSecond
-			rhsSecond := cwndSecond * (2 * uint64(lowerRTT) + delta)
-
-		    if lhsSecond > rhsSecond {
-			    sch.waiting = 1
-			    return nil
-			}
-		} else {
-			sch.waiting = 0
-		}
-		return secondBestPath
+	}
+	
+	if bestPath == nil{
+		return s.paths[protocol.InitialPathID]
 	}
 
+	if bestPath.SendingAllowed() {
+		return bestPath
+	}
+	return nil
+}
